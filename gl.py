@@ -1,7 +1,12 @@
 import struct
 from collections import namedtuple
+import numpy as np
+
+from obj import Obj
 
 V2 = namedtuple('Point2', ['x', 'y'])
+V3 = namedtuple('Point3', ['x', 'y', 'z'])
+V4 = namedtuple('Point4', ['x', 'y', 'z', 'w'])
 
 def char(c):
     #1 byte
@@ -70,6 +75,56 @@ class Renderer(object):
         y = int(y)
 
         self.glPoint(x,y,clr)
+
+    def glCreateObjectMatrix(self, translate = V3(0,0,0), rotate = V3(0,0,0), scale = V3(1,1,1)):
+
+        translation = np.matrix([[1, 0, 0, translate.x],
+                                 [0, 1, 0, translate.y],
+                                 [0, 0, 1, translate.z],
+                                 [0, 0, 0, 1]])
+
+        rotation = np.identity(4)
+
+        scaleMat = np.matrix([[scale.x, 0, 0, 0],
+                              [0, scale.y, 0, 0],
+                              [0, 0, scale.z, 0],
+                              [0, 0, 0, 1]])
+
+        return translation * rotation * scaleMat
+
+    def glTransform(self, vertex, matrix):
+
+        v = V4(vertex[0], vertex[1], vertex[2], 1)
+        vt = matrix @ v
+        vt = vt.tolist()[0]
+        vf = V3(vt[0] / vt[3],
+                vt[1] / vt[3],
+                vt[2] / vt[3])
+
+        return vf
+
+
+
+    def glLoadModel(self, filename, translate = V3(0,0,0), rotate = V3(0,0,0), scale = V3(1,1,1)):
+        model = Obj(filename)
+        modelMatrix = self.glCreateObjectMatrix(translate, rotate, scale)
+
+        for face in model.faces:
+            vertCount = len(face)
+            for vert in range(vertCount):
+                v0 = model.vertices[ face[vert][0] - 1]
+                v1 = model.vertices[ face[(vert + 1) % vertCount][0] - 1]
+
+                v0 = self.glTransform(v0, modelMatrix)
+                v1 = self.glTransform(v1, modelMatrix)
+
+                self.glLine(V2(v0.x, v0.y), V2(v1.x, v1.y))
+
+
+
+
+
+                
 
 
 
