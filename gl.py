@@ -2,6 +2,8 @@ import struct
 from collections import namedtuple
 import numpy as np
 
+import random
+
 from obj import Obj
 
 V2 = namedtuple('Point2', ['x', 'y'])
@@ -111,20 +113,20 @@ class Renderer(object):
 
         for face in model.faces:
             vertCount = len(face)
-            for vert in range(vertCount):
-                v0 = model.vertices[ face[vert][0] - 1]
-                v1 = model.vertices[ face[(vert + 1) % vertCount][0] - 1]
 
-                v0 = self.glTransform(v0, modelMatrix)
-                v1 = self.glTransform(v1, modelMatrix)
+            v0 = model.vertices[ face[0][0] - 1]
+            v1 = model.vertices[ face[1][0] - 1]
+            v2 = model.vertices[ face[2][0] - 1]
 
-                self.glLine(V2(v0.x, v0.y), V2(v1.x, v1.y))
-
-
+            v0 = self.glTransform(v0, modelMatrix)
+            v1 = self.glTransform(v1, modelMatrix)
+            v2 = self.glTransform(v2, modelMatrix)
 
 
 
-                
+            self.glTriangle_std(v0, v1, v2, color(random.random(),
+                                                  random.random(),
+                                                  random.random()))
 
 
 
@@ -187,17 +189,59 @@ class Renderer(object):
                 limit += 1
 
 
+    def glTriangle_std(self, A, B, C, clr = None):
+        
+        if A.y < B.y:
+            A, B = B, A
+        if A.y < C.y:
+            A, C = C, A
+        if B.y < C.y:
+            B, C = C, B
 
+        self.glLine(A,B, clr)
+        self.glLine(B,C, clr)
+        self.glLine(C,A, clr)
 
+        def flatBottom(vA,vB,vC):
+            try:
+                mBA = (vB.x - vA.x) / (vB.y - vA.y)
+                mCA = (vC.x - vA.x) / (vC.y - vA.y)
+            except:
+                pass
+            else:
+                x0 = vB.x
+                x1 = vC.x
+                for y in range(int(vB.y), int(vA.y)):
+                    self.glLine(V2(x0, y), V2(x1, y), clr)
+                    x0 += mBA
+                    x1 += mCA
 
+        def flatTop(vA,vB,vC):
+            try:
+                mCA = (vC.x - vA.x) / (vC.y - vA.y)
+                mCB = (vC.x - vB.x) / (vC.y - vB.y)
+            except:
+                pass
+            else:
+                x0 = vA.x
+                x1 = vB.x
+                for y in range(int(vA.y), int(vC.y), -1):
+                    self.glLine(V2(x0, y), V2(x1, y), clr)
+                    x0 -= mCA
+                    x1 -= mCB
 
-
-       
-
-
-
-
-
+        if B.y == C.y:
+            # Parte plana abajo
+            flatBottom(A,B,C)
+        elif A.y == B.y:
+            # Parte plana arriba
+            flatTop(A,B,C)
+        else:
+            # Dibujo ambos tipos de triangulos
+            # Teorema de intercepto
+            D = V2( A.x + ((B.y - A.y) / (C.y - A.y)) * (C.x - A.x), B.y)
+            flatBottom(A,B,D)
+            flatTop(B,D,C)
 
 
     def glFinish(self, filename):
