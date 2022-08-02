@@ -2,6 +2,8 @@ import struct
 from collections import namedtuple
 import numpy as np
 
+from math import cos, sin, pi
+
 import random
 
 from obj import Obj
@@ -26,6 +28,23 @@ def color(r, g, b):
     return bytes([int(b * 255),
                   int(g * 255),
                   int(r * 255)] )
+
+def baryCoords(A, B, C, P):
+
+    areaPBC = (B.y - C.y) * (P.x - C.x) + (C.x - B.x) * (P.y - C.y)
+    areaPAC = (C.y - A.y) * (P.x - C.x) + (A.x - C.x) * (P.y - C.y)
+    areaABC = (B.y - C.y) * (A.x - C.x) + (C.x - B.x) * (A.y - C.y)
+
+    # PBC / ABC
+    u = areaPBC / areaABC
+
+    # PAC / ABC
+    v = areaPAC / areaABC
+
+    # 1 - u - v
+    w = 1 - u - v
+
+    return u, v, w
 
 class Renderer(object):
     def __init__(self, width, height):
@@ -54,7 +73,10 @@ class Renderer(object):
 
     def glClear(self):
         self.pixels = [[ self.clearColor for y in range(self.height)]
-                       for x in range(self.width)]
+                         for x in range(self.width)]
+
+        self.zbuffer = [[ float('inf') for y in range(self.height)]
+                          for x in range(self.width)]
 
     def glClearViewport(self, clr = None):
         for x in range(self.vpX, self.vpX + self.vpWidth):
@@ -78,6 +100,31 @@ class Renderer(object):
 
         self.glPoint(x,y,clr)
 
+
+    def glCreateRotationMatrix(self, pitch = 0, yaw = 0, roll = 0):
+        
+        pitch *= pi/180
+        yaw   *= pi/180
+        roll  *= pi/180
+
+        pitchMat = np.matrix([[1, 0, 0, 0],
+                              [0, cos(pitch),-sin(pitch), 0],
+                              [0, sin(pitch), cos(pitch), 0],
+                              [0, 0, 0, 1]])
+
+        yawMat = np.matrix([[cos(yaw), 0, sin(yaw), 0],
+                            [0, 1, 0, 0],
+                            [-sin(yaw), 0, cos(yaw), 0],
+                            [0, 0, 0, 1]])
+
+        rollMat = np.matrix([[cos(roll),-sin(roll), 0, 0],
+                             [sin(roll), cos(roll), 0, 0],
+                             [0, 0, 1, 0],
+                             [0, 0, 0, 1]])
+
+        return pitchMat * yawMat * rollMat
+
+
     def glCreateObjectMatrix(self, translate = V3(0,0,0), rotate = V3(0,0,0), scale = V3(1,1,1)):
 
         translation = np.matrix([[1, 0, 0, translate.x],
@@ -85,7 +132,7 @@ class Renderer(object):
                                  [0, 0, 1, translate.z],
                                  [0, 0, 0, 1]])
 
-        rotation = np.identity(4)
+        rotation = self.glCreateRotationMatrix(rotate.x, rotate.y, rotate.z)
 
         scaleMat = np.matrix([[scale.x, 0, 0, 0],
                               [0, scale.y, 0, 0],
@@ -106,7 +153,6 @@ class Renderer(object):
         return vf
 
 
-
     def glLoadModel(self, filename, translate = V3(0,0,0), rotate = V3(0,0,0), scale = V3(1,1,1)):
         model = Obj(filename)
         modelMatrix = self.glCreateObjectMatrix(translate, rotate, scale)
@@ -124,7 +170,7 @@ class Renderer(object):
 
 
 
-            self.glTriangle_std(v0, v1, v2, color(random.random(),
+            self.glTriangle_bc(v0, v1, v2, color(random.random(),
                                                   random.random(),
                                                   random.random()))
 
@@ -242,6 +288,30 @@ class Renderer(object):
             D = V2( A.x + ((B.y - A.y) / (C.y - A.y)) * (C.x - A.x), B.y)
             flatBottom(A,B,D)
             flatTop(B,D,C)
+
+
+
+
+    def glTriangle_bc(self, A, B, C, clr = None):
+        # bounding box
+        minX = round(min(A.x, B.x, C.x))
+        minY = round(min(A.y, B.y, C.y))
+        maxX = round(max(A.x, B.x, C.x))
+        maxY = round(max(A.y, B.y, C.y))
+
+
+        for x in range(minX, maxX + 1):
+            for y in range(minY, maxY + 1):
+                u, v, w = baryCoords(A, B, C, V2(x, y))
+
+                if 0<=u and 0<=v and 0<=w:
+
+                    z = A.z * u + B.z * v + C.z * w
+
+                    if z < self.zbuffer[x][y]:
+                        self.zbuffer[x][y] = z
+                        self.glPoint(x,y, clr)
+
 
 
     def glFinish(self, filename):
