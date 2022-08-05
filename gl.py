@@ -57,8 +57,9 @@ class Renderer(object):
         self.currColor = color(1,1,1)
 
         self.active_shader = None
+        self.active_texture = None
 
-        self.dirLight = V3(1,0,0)
+        self.dirLight = V3(0,0,1)
 
         self.glViewport(0,0,self.width, self.height)
         
@@ -173,12 +174,24 @@ class Renderer(object):
             v1 = self.glTransform(v1, modelMatrix)
             v2 = self.glTransform(v2, modelMatrix)
 
-            self.glTriangle_bc(v0, v1, v2)
+            vt0 = model.texcoords[face[0][1] - 1]
+            vt1 = model.texcoords[face[1][1] - 1]
+            vt2 = model.texcoords[face[2][1] - 1]
+
+            vn0 = model.normals[face[0][2] - 1]
+            vn1 = model.normals[face[1][2] - 1]
+            vn2 = model.normals[face[2][2] - 1]
+
+            self.glTriangle_bc(v0, v1, v2, texCoords = (vt0, vt1, vt2), normals = (vn0, vn1, vn2))
 
             if vertCount == 4:
                 v3 = model.vertices[ face[3][0] - 1]
                 v3 = self.glTransform(v3, modelMatrix)
-                self.glTriangle_bc(v0, v2, v3)
+                vt3 = model.texcoords[face[3][1] - 1]
+                vn3 = model.normals[face[3][2] - 1]
+
+
+                self.glTriangle_bc(v0, v2, v3, texCoords = (vt0, vt2, vt3), normals = (vn0, vn2, vn3))
 
 
 
@@ -297,9 +310,7 @@ class Renderer(object):
             flatTop(B,D,C)
 
 
-
-
-    def glTriangle_bc(self, A, B, C, clr = None):
+    def glTriangle_bc(self, A, B, C, texCoords = (), normals = (), clr = None):
         # bounding box
         minX = round(min(A.x, B.x, C.x))
         minY = round(min(A.y, B.y, C.y))
@@ -319,20 +330,23 @@ class Renderer(object):
 
                     z = A.z * u + B.z * v + C.z * w
 
-                    if z < self.zbuffer[x][y]:
-                        self.zbuffer[x][y] = z
+                    if 0<=x<self.width and 0<=y<self.height:
+                        if z < self.zbuffer[x][y]:
+                            self.zbuffer[x][y] = z
 
-                        if self.active_shader:
-                            r, g, b = self.active_shader(self,
-                                                         baryCoords=(u,v,w),
-                                                         vColor = clr or self.currColor,
-                                                         triangleNormal = triangleNormal)
+                            if self.active_shader:
+                                r, g, b = self.active_shader(self,
+                                                             baryCoords=(u,v,w),
+                                                             vColor = clr or self.currColor,
+                                                             texCoords = texCoords,
+                                                             normals = normals,
+                                                             triangleNormal = triangleNormal)
 
 
 
-                            self.glPoint(x, y, color(r,g,b))
-                        else:
-                            self.glPoint(x,y, clr)
+                                self.glPoint(x, y, color(r,g,b))
+                            else:
+                                self.glPoint(x,y, clr)
 
 
 

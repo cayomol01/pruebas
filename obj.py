@@ -24,14 +24,6 @@ class Obj(object):
             elif prefix == 'f':
                 self.faces.append([  list(map(int, vert.split('/'))) for vert in value.split(' ')] )
 
-                #vertList = []
-                #for vert in value.split(' '):
-                #    indices = vert.split('/')
-                #    indices = map(int, indices)
-                #    indices = list(indices)
-                #    vertList.append(indices)
-                #self.faces.append(vertList)
-
        
 
 
