@@ -22,7 +22,7 @@ class Obj(object):
             elif prefix == 'vn':
                 self.normals.append( list(map(float, value.split(' '))))
             elif prefix == 'f':
-                self.faces.append([  list(map(int, vert.split('/'))) for vert in value.split(' ')] )
+                self.faces.append([  list(map(int, vert.strip().split('/'))) for vert in value.strip().split(' ')] )
 
        
 
